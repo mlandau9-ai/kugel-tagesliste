@@ -444,6 +444,7 @@
    ========================================================= */
 const API_URL = 'https://script.google.com/macros/s/AKfycbyvBt19l7E-Up3sY1xjUEh_tMX3fp58U8UkJYs67ZJVBZ8oz7jhNVsjD7KbuPPlqJ0t/exec';
 const POLL_MS = 8000;
+const NOTE_VISIBILITY_MS = 24 * 60 * 60 * 1000;
 
 /* ---------- Speicher ---------- */
 const store = {
@@ -657,39 +658,7 @@ function renderList(tasks, done) {
   list.replaceChildren(frag);
 }
 
-function renderNotes() {
-  const week = Date.now() - 7 * 864e5, threeDays = Date.now() - 3 * 864e5;
-  const notes = (state.notes || []).filter(x => !x.ts || x.ts > week);
-  // Oben: Notizen für diese Schicht, die noch niemand zur Kenntnis genommen hat
-  const pinned = notes.filter(x => x.for === shift && x.id && !noteAcks(x).length && x.ts > threeDays && x.name !== me.name);
-  $('inbox').replaceChildren(...pinned.map(x => {
-    const box = el('article', 'pin');
-    box.append(el('div', 'meta', 'Für ' + FOR_LABEL[shift] + ' von ' + x.name + ', ' + whenLabel(x)), el('p', '', x.text));
-    const b = el('button', 'ack', 'Zur Kenntnis genommen'); b.type = 'button';
-    b.addEventListener('click', () => ack(x.id));
-    box.appendChild(b);
-    return box;
-  }));
-
-  const rest = notes.filter(x => !pinned.includes(x)).slice(0, 15);
-  $('feed').replaceChildren(...rest.map(x => {
-    const li = el('li', x.name === me.name ? 'mine' : '');
-    li.append(el('div', 'meta', x.name + ', ' + whenLabel(x) + (x.for ? ', für ' + FOR_LABEL[x.for] : '')), el('p', '', x.text));
-    const acks = noteAcks(x);
-    if (acks.length) {
-      const a = el('div', 'acked');
-      a.innerHTML = 'Zur Kenntnis genommen von ' + acks.map(k => '<b>' + esc(k.by) + '</b> ' + esc(k.at)).join(', ');
-      li.appendChild(a);
-    }
-    if (x.id && x.name !== me.name && !acks.some(k => k.by === me.name)) {
-      const b = el('button', 'ack small', 'Zur Kenntnis genommen'); b.type = 'button';
-      b.addEventListener('click', () => ack(x.id));
-      li.appendChild(b);
-    }
-    return li;
-  }));
-  if (!rest.length && !pinned.length) $('feed').innerHTML = '<li><p class="meta">Noch keine Notizen in den letzten 7 Tagen.</p></li>';
-}
+function renderNotes() { const visibleAfter = Date.now() - NOTE_VISIBILITY_MS; const notes = (state.notes || []).filter(x => x.ts && x.ts >= visibleAfter); const pinned = notes.filter(x => x.for === shift && x.id && !noteAcks(x).length && x.name !== me.name); $('inbox').replaceChildren(...pinned.map(x => { const box = el('article', 'pin'); box.append(el('div', 'meta', 'Für ' + FOR_LABEL[shift] + ' von ' + x.name + ', ' + whenLabel(x)), el('p', '', x.text)); const b = el('button', 'ack', 'Zur Kenntnis genommen'); b.type = 'button'; b.addEventListener('click', () => ack(x.id)); box.appendChild(b); return box; })); const rest = notes.filter(x => !pinned.includes(x)).slice(0, 15); $('feed').replaceChildren(...rest.map(x => { const li = el('li', x.name === me.name ? 'mine' : ''); li.append(el('div', 'meta', x.name + ', ' + whenLabel(x) + (x.for ? ', für ' + FOR_LABEL[x.for] : '')), el('p', '', x.text)); const acks = noteAcks(x); if (acks.length) { const a = el('div', 'acked'); a.innerHTML = 'Zur Kenntnis genommen von ' + acks.map(k => '<b>' + esc(k.by) + '</b> ' + esc(k.at)).join(', '); li.appendChild(a); } else if (x.id && x.name !== me.name) { const b = el('button', 'ack small', 'Zur Kenntnis genommen'); b.type = 'button'; b.addEventListener('click', () => ack(x.id)); li.appendChild(b); } return li; })); if (!rest.length && !pinned.length) $('feed').innerHTML = '<li><p class="meta">Noch keine Notizen in den letzten 24 Stunden.</p></li>'; }
 
 /* ---------- Bearbeiten ---------- */
 function renderEditor(focusSel) {
